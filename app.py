@@ -1,56 +1,44 @@
 from flask import Flask, request, jsonify
 from tensorflow.keras.models import load_model # type: ignore
-from PIL import Image # type: ignore
+from tensorflow.keras.preprocessing.image import load_img, img_to_array # type: ignore
 import numpy as np
 import io
-#from my_custom_module import CustomLayer # type: ignore
 
-# إنشاء تطبيق Flask
 app = Flask(__name__)
 
-# تحميل الموديل
-MODEL_PATH = 'efficientnetv2B1 (1).keras'  # المسار إلى ملف الموديل
-model = load_model(MODEL_PATH)
+# Load your trained model
+model = load_model("best_model.keras")
 
-# إعداد معلمات الصورة
-IMAGE_SIZE = (224, 224)  # تعديل حجم الصورة حسب ما يتوقعه النموذج
-
-# دالة التنبؤ
-def predict(image):
-    # معالجة الصورة لتناسب المدخلات المتوقعة من النموذج
-    image = image.resize(IMAGE_SIZE)  # تغيير حجم الصورة
-    image_array = np.array(image) / 255.0  # تحويل إلى مصفوفة وتطبيع القيم
-    image_array = np.expand_dims(image_array, axis=0)  # إضافة بعد جديد
-    prediction = model.predict(image_array)  # تنبؤ باستخدام الموديل
-    result = np.argmax(prediction)  # اختيار التصنيف الأكثر احتمالاً
-    return "Malignant" if result == 1 else "Benign"  # إعادة النتيجة النصية
-
-# نقطة النهاية الرئيسية
-@app.route('/')
-def index():
-    return "Flask API for Image Classification is running!"
-
-# نقطة النهاية للتنبؤ
 @app.route('/predict', methods=['POST'])
-def predict_endpoint():
+def predict():
     try:
-        # التحقق من وجود ملف في الطلب
+        # Check if a file is in the request
         if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
-
-        # قراءة الملف
+            return jsonify({"error": "No file provided"}), 400
+        
         file = request.files['file']
-        image = Image.open(io.BytesIO(file.read()))  # قراءة الصورة
+        if not file:
+            return jsonify({"error": "Invalid file"}), 400
 
-        # التنبؤ باستخدام الموديل
-        result = predict(image)
+        # Read the file as a file-like object
+        file_stream = io.BytesIO(file.read())
 
-        # إعادة النتيجة
-        return jsonify({'prediction': result})
+        # Load and preprocess the image
+        img = load_img(file_stream, target_size=(128, 128))  # Resize to 128x128
+        img_array = img_to_array(img)
+        img_array = img_array / 255.0  # Normalize pixel values
+        img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
 
+        # Make predictions
+        prediction = model.predict(img_array)
+        predicted_class = int(prediction[0][0] > 0.5)  # Binary classification
+
+        return jsonify({
+            "prediction": "Benign" if predicted_class == 0 else "Malignant",
+            "confidence": float(prediction[0][0])
+        })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
-# تشغيل التطبيق
 if __name__ == '__main__':
-    app.run(debug=True)
+   app.run(host="0.0.0.0", port=5000, debug=True)

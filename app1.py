@@ -7,7 +7,7 @@ import io
 
 app = Flask(__name__)
 
-MODEL_PATH = "efficientnetv2B1.keras"
+MODEL_PATH = "best_model.keras"
 custom_objects = {"RandomRotation": RandomRotation}
 
 # Load the model
@@ -45,7 +45,7 @@ def predict_endpoint():
         probability = float(prediction[0][0])
 
         # Apply threshold logic
-        if probability >= 0.5:
+        if probability == 1:
             label = "Malignant"
             confidence = probability
         else:
@@ -62,3 +62,7 @@ def predict_endpoint():
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
+
+
+
+
